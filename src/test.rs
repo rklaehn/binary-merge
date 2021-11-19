@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use crate::{EarlyOut, MergeOperation, MergeStateRead};
+use crate::{MergeOperation, MergeStateRead};
 use proptest::prelude::*;
 
 struct VecMergeState<'a, T> {
@@ -46,20 +46,20 @@ impl<'a, T> MergeStateRead for BoolMergeState<'a, T> {
 struct Union;
 
 impl<'a, T: Ord + Copy> MergeOperation<VecMergeState<'a, T>> for Union {
-    fn from_a(&self, m: &mut VecMergeState<'a, T>, n: usize) -> EarlyOut {
+    fn from_a(&self, m: &mut VecMergeState<'a, T>, n: usize) -> bool {
         m.r.extend((&mut m.a).cloned().take(n));
-        Some(())
+        true
     }
 
-    fn from_b(&self, m: &mut VecMergeState<'a, T>, n: usize) -> EarlyOut {
+    fn from_b(&self, m: &mut VecMergeState<'a, T>, n: usize) -> bool {
         m.r.extend((&mut m.b).cloned().take(n));
-        Some(())
+        true
     }
 
-    fn collision(&self, m: &mut VecMergeState<'a, T>) -> EarlyOut {
+    fn collision(&self, m: &mut VecMergeState<'a, T>) -> bool {
         m.r.extend((&mut m.a).cloned().take(1));
         m.b.next();
-        Some(())
+        true
     }
 
     fn cmp(&self, a: &T, b: &T) -> std::cmp::Ordering {
@@ -70,20 +70,20 @@ impl<'a, T: Ord + Copy> MergeOperation<VecMergeState<'a, T>> for Union {
 struct Intersection;
 
 impl<'a, T: Ord + Copy> MergeOperation<VecMergeState<'a, T>> for Intersection {
-    fn from_a(&self, m: &mut VecMergeState<'a, T>, n: usize) -> EarlyOut {
+    fn from_a(&self, m: &mut VecMergeState<'a, T>, n: usize) -> bool {
         (&mut m.a).take(n).for_each(drop);
-        Some(())
+        true
     }
 
-    fn from_b(&self, m: &mut VecMergeState<'a, T>, n: usize) -> EarlyOut {
+    fn from_b(&self, m: &mut VecMergeState<'a, T>, n: usize) -> bool {
         (&mut m.b).take(n).for_each(drop);
-        Some(())
+        true
     }
 
-    fn collision(&self, m: &mut VecMergeState<'a, T>) -> EarlyOut {
+    fn collision(&self, m: &mut VecMergeState<'a, T>) -> bool {
         m.r.extend((&mut m.a).cloned().take(1));
         m.b.next();
-        Some(())
+        true
     }
 
     fn cmp(&self, a: &T, b: &T) -> std::cmp::Ordering {
@@ -94,19 +94,19 @@ impl<'a, T: Ord + Copy> MergeOperation<VecMergeState<'a, T>> for Intersection {
 struct Intersects;
 
 impl<'a, T: Ord + Copy> MergeOperation<BoolMergeState<'a, T>> for Intersects {
-    fn from_a(&self, m: &mut BoolMergeState<'a, T>, n: usize) -> EarlyOut {
+    fn from_a(&self, m: &mut BoolMergeState<'a, T>, n: usize) -> bool {
         (&mut m.a).take(n).for_each(drop);
-        Some(())
+        true
     }
 
-    fn from_b(&self, m: &mut BoolMergeState<'a, T>, n: usize) -> EarlyOut {
+    fn from_b(&self, m: &mut BoolMergeState<'a, T>, n: usize) -> bool {
         (&mut m.b).take(n).for_each(drop);
-        Some(())
+        true
     }
 
-    fn collision(&self, m: &mut BoolMergeState<'a, T>) -> EarlyOut {
+    fn collision(&self, m: &mut BoolMergeState<'a, T>) -> bool {
         m.r = true;
-        None
+        false
     }
 
     fn cmp(&self, a: &T, b: &T) -> std::cmp::Ordering {
@@ -117,7 +117,7 @@ impl<'a, T: Ord + Copy> MergeOperation<BoolMergeState<'a, T>> for Intersects {
 fn arb_sorted_vec() -> BoxedStrategy<Vec<u8>> {
     any::<Vec<u8>>()
         .prop_map(|mut v| {
-            v.sort();
+            v.sort_unstable();
             v.dedup();
             v
         })
@@ -148,7 +148,7 @@ fn smoke() {
         r: Default::default(),
     };
     Intersects.merge(&mut s);
-    assert_eq!(s.r, true);
+    assert!(s.r);
 }
 
 fn std_set_union(a: Vec<u8>, b: Vec<u8>) -> Vec<u8> {

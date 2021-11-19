@@ -1,6 +1,7 @@
 //! Minimum comparison merge of two random access sequences
 #[cfg(test)]
 mod test;
+
 use core::cmp::Ordering;
 
 /// The read part of the merge state that is needed for the binary merge algorithm
@@ -18,10 +19,6 @@ pub trait MergeStateRead {
     fn b_slice(&self) -> &[Self::B];
 }
 
-/// Basically a convenient to use bool to allow aborting a piece of code early using ?
-/// return `None` to abort and `Some(())` to continue
-pub type EarlyOut = Option<()>;
-
 /// A binary merge operation
 ///
 /// It is often useful to keep the merge operation and the merge state separate. E.g. computing the
@@ -31,12 +28,12 @@ pub type EarlyOut = Option<()>;
 ///
 /// The operation itself will often be a zero size struct
 pub trait MergeOperation<M: MergeStateRead> {
-    /// Take n elements from a
-    fn from_a(&self, m: &mut M, n: usize) -> EarlyOut;
-    /// Take n elements from b
-    fn from_b(&self, m: &mut M, n: usize) -> EarlyOut;
-    /// Take 1 element from both a and b
-    fn collision(&self, m: &mut M) -> EarlyOut;
+    /// Take n elements from a, return true to continue operation
+    fn from_a(&self, m: &mut M, n: usize) -> bool;
+    /// Take n elements from b, return true to continue operation
+    fn from_b(&self, m: &mut M, n: usize) -> bool;
+    /// Take 1 element from both a and b, return true to continue operation
+    fn collision(&self, m: &mut M) -> bool;
     /// The comparison operation
     fn cmp(&self, a: &M::A, b: &M::B) -> Ordering;
     /// merge `an` elements from a and `bn` elements from b into the result
@@ -46,14 +43,20 @@ pub trait MergeOperation<M: MergeStateRead> {
     ///
     /// It does make a big difference e.g. when merging a very large and a very small sequence,
     /// or two disjoint sequences.
-    fn binary_merge(&self, m: &mut M, an: usize, bn: usize) -> EarlyOut {
+    ///
+    /// returns false if the operation was prematurely st
+    fn merge0(&self, m: &mut M, an: usize, bn: usize) -> bool {
         if an == 0 {
             if bn > 0 {
-                self.from_b(m, bn)?
+                self.from_b(m, bn)
+            } else {
+                true
             }
         } else if bn == 0 {
             if an > 0 {
-                self.from_a(m, an)?
+                self.from_a(m, an)
+            } else {
+                true
             }
         } else {
             // neither a nor b are 0
@@ -64,58 +67,57 @@ pub trait MergeOperation<M: MergeStateRead> {
                 Ok(bm) => {
                     // same elements. bm is the index corresponding to am
                     // merge everything below am with everything below the found element bm
-                    self.binary_merge(m, am, bm)?;
+                    self.merge0(m, am, bm) &&
                     // add the elements a(am) and b(bm)
-                    self.collision(m)?;
+                    self.collision(m) &&
                     // merge everything above a(am) with everything above the found element
-                    self.binary_merge(m, an - am - 1, bn - bm - 1)?;
+                    self.merge0(m, an - am - 1, bn - bm - 1)
                 }
                 Err(bi) => {
                     // not found. bi is the insertion point
                     // merge everything below a(am) with everything below the found insertion point bi
-                    self.binary_merge(m, am, bi)?;
+                    self.merge0(m, am, bi) &&
                     // add a(am)
-                    self.from_a(m, 1)?;
+                    self.from_a(m, 1) &&
                     // everything above a(am) with everything above the found insertion point
-                    self.binary_merge(m, an - am - 1, bn - bi)?;
+                    self.merge0(m, an - am - 1, bn - bi)
                 }
             }
         }
-        Some(())
     }
     /// This is the classical tape merge algorithm, useful for when either
     /// the number of elements is small or the comparison operation is very cheap.
-    fn tape_merge(&self, m: &mut M) -> EarlyOut {
+    fn tape_merge(&self, m: &mut M) -> bool {
         while !m.a_slice().is_empty() && !m.b_slice().is_empty() {
             // very convoluted way to access the first element.
             let a = &m.a_slice()[0];
             let b = &m.b_slice()[0];
             // calling the various ops advances the pointers
-            match self.cmp(a, b) {
-                Ordering::Equal => self.collision(m)?,
-                Ordering::Less => self.from_a(m, 1)?,
-                Ordering::Greater => self.from_b(m, 1)?,
+            let r = match self.cmp(a, b) {
+                Ordering::Equal => self.collision(m),
+                Ordering::Less => self.from_a(m, 1),
+                Ordering::Greater => self.from_b(m, 1),
+            };
+            if !r {
+                return false;
             }
         }
-        if !m.a_slice().is_empty() {
-            self.from_a(m, m.a_slice().len())?;
+        if !m.a_slice().is_empty() && !self.from_a(m, m.a_slice().len()) {
+            return false;
         }
-        if !m.b_slice().is_empty() {
-            self.from_b(m, m.b_slice().len())?;
+        if !m.b_slice().is_empty() && !self.from_b(m, m.b_slice().len()) {
+            return false;
         }
-        Some(())
+        true
     }
-    /// Merge using
-    /// - the minimum comparison merge when a or b is > MCM_THRESHOLD
-    /// - a tape merge otherwise
-    fn merge(&self, m: &mut M) {
+    fn merge(&self, m: &mut M) -> bool {
         let an = m.a_slice().len();
         let bn = m.b_slice().len();
         // only use the minimum comparison merge when it is worth it
         if an > Self::MCM_THRESHOLD || bn > Self::MCM_THRESHOLD {
-            self.binary_merge(m, an, bn);
+            self.merge0(m, an, bn)
         } else {
-            self.tape_merge(m);
+            self.tape_merge(m)
         }
     }
     /// Threshold above which we use the minimum comparison merge
