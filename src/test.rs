@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use crate::{MergeOperation, MergeStateRead};
+use crate::{MergeOperation, MergeState};
 use proptest::prelude::*;
 
 struct VecMergeState<'a, T> {
@@ -9,7 +9,7 @@ struct VecMergeState<'a, T> {
     r: Vec<T>,
 }
 
-impl<'a, T> MergeStateRead for VecMergeState<'a, T> {
+impl<'a, T> MergeState for VecMergeState<'a, T> {
     type A = T;
 
     type B = T;
@@ -29,7 +29,7 @@ struct BoolMergeState<'a, T> {
     r: bool,
 }
 
-impl<'a, T> MergeStateRead for BoolMergeState<'a, T> {
+impl<'a, T> MergeState for BoolMergeState<'a, T> {
     type A = T;
 
     type B = T;
@@ -114,14 +114,12 @@ impl<'a, T: Ord + Copy> MergeOperation<BoolMergeState<'a, T>> for Intersects {
     }
 }
 
-fn arb_sorted_vec() -> BoxedStrategy<Vec<u8>> {
-    any::<Vec<u8>>()
-        .prop_map(|mut v| {
-            v.sort_unstable();
-            v.dedup();
-            v
-        })
-        .boxed()
+fn arb_sorted_vec() -> impl Strategy<Value = Vec<u8>> {
+    any::<Vec<u8>>().prop_map(|mut v| {
+        v.sort_unstable();
+        v.dedup();
+        v
+    })
 }
 
 #[test]

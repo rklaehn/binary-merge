@@ -8,7 +8,7 @@ use core::cmp::Ordering;
 /// it just needs random access for the remainder of a and b
 ///
 /// Very often A and B are the same type, but this is not strictly necessary
-pub trait MergeStateRead {
+pub trait MergeState {
     /// Element type for a
     type A;
     /// Element type for b
@@ -27,7 +27,7 @@ pub trait MergeStateRead {
 /// can use the same merge operation. THerefore, the merge state is an additional parameter.SortedPairIter
 ///
 /// The operation itself will often be a zero size struct
-pub trait MergeOperation<M: MergeStateRead> {
+pub trait MergeOperation<M: MergeState> {
     /// Take n elements from a, return true to continue operation
     fn from_a(&self, m: &mut M, n: usize) -> bool;
     /// Take n elements from b, return true to continue operation
