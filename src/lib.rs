@@ -44,20 +44,12 @@ pub trait MergeOperation<M: MergeState> {
     /// It does make a big difference e.g. when merging a very large and a very small sequence,
     /// or two disjoint sequences.
     ///
-    /// returns false if the operation was prematurely st
-    fn merge0(&self, m: &mut M, an: usize, bn: usize) -> bool {
+    /// returns false if the operation was prematurely aborted
+    fn binary_merge(&self, m: &mut M, an: usize, bn: usize) -> bool {
         if an == 0 {
-            if bn > 0 {
-                self.from_b(m, bn)
-            } else {
-                true
-            }
+            bn == 0 || self.from_b(m, bn)
         } else if bn == 0 {
-            if an > 0 {
-                self.from_a(m, an)
-            } else {
-                true
-            }
+            an == 0 || self.from_a(m, an)
         } else {
             // neither a nor b are 0
             let am: usize = an / 2;
@@ -67,20 +59,20 @@ pub trait MergeOperation<M: MergeState> {
                 Ok(bm) => {
                     // same elements. bm is the index corresponding to am
                     // merge everything below am with everything below the found element bm
-                    self.merge0(m, am, bm) &&
+                    self.binary_merge(m, am, bm) &&
                     // add the elements a(am) and b(bm)
                     self.collision(m) &&
                     // merge everything above a(am) with everything above the found element
-                    self.merge0(m, an - am - 1, bn - bm - 1)
+                    self.binary_merge(m, an - am - 1, bn - bm - 1)
                 }
                 Err(bi) => {
                     // not found. bi is the insertion point
                     // merge everything below a(am) with everything below the found insertion point bi
-                    self.merge0(m, am, bi) &&
+                    self.binary_merge(m, am, bi) &&
                     // add a(am)
                     self.from_a(m, 1) &&
                     // everything above a(am) with everything above the found insertion point
-                    self.merge0(m, an - am - 1, bn - bi)
+                    self.binary_merge(m, an - am - 1, bn - bi)
                 }
             }
         }
@@ -115,7 +107,7 @@ pub trait MergeOperation<M: MergeState> {
         let bn = m.b_slice().len();
         // only use the minimum comparison merge when it is worth it
         if an > Self::MCM_THRESHOLD || bn > Self::MCM_THRESHOLD {
-            self.merge0(m, an, bn)
+            self.binary_merge(m, an, bn)
         } else {
             self.tape_merge(m)
         }
