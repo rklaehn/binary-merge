@@ -78,13 +78,13 @@ Before we start thinking about complex things, let's consider the base case(s). 
 
 It is clear that we have to gain the maximum information from each comparison in order to limit the number of comparisons to the minimum. So it seems intuitively obvious that we have to compare the *middle* element of `a` with the *middle* element of `b`. No matter what the result of the comparison is, we have 50% of all elements in `a` that we never again have to compare with 50% of the elements in `b`. We have gained information for a quarter of all possible comparisons with just a single comparison. If you had a table of size m \* n with each cell being a possible comparison, executing the comparison at the *center* of the table allows you to eliminate an entire quadrant of the table.
 
-   | 5 | 6 | 7 | 8 | 9 |
----|---|---|---|---|---|
- 1 |   |   | > | > | > |
- 3 |   |   | > | > | > |
- 5 |   |   | > | > | > |
- 7 |   |   |   |   |   |
- 9 |   |   |   |   |   |
+|   | 5 | 6 | 7 | 8 | 9 |
+|---|---|---|---|---|---|
+| 1 |   |   | > | > | > |
+| 3 |   |   | > | > | > |
+| 5 |   |   | > | > | > |
+| 7 |   |   |   |   |   |
+| 9 |   |   |   |   |   |
 
 ```
 am = (a0 + a1) / 2
@@ -101,29 +101,39 @@ We have to merge elements `a0 until am` from `a` with all elements `b0 until bm`
 
 And that's it. Here is our code, for the case that `a` and `b` are disjoint ordered sets.
 
-```scala
-def merge0(a0: Int, a1: Int, b0: Int, b1: Int): Unit = {
-  if (a0 == a1) {
-    // base case 1
-    fromB(b0, b1) 
-  } else if (b0 == b1) {
-    // base case 2
-    fromA(a0, a1)
-  } else {
-    // find position of center element of a in b
-    val am = (a0 + a1) / 2
-    // binary search for element a(am) in b, from b0 until b1
-    val res = binarySearchB(am, b0, b1)
-    // we know that res is negative, since a and b do not have common elements
-    val bm = -res - 1
-    // merge everything below a(am) with everything below the found insertion point into the result
-    merge0(a0, am, b0, bm)
-    // add a(am) to the result
-    fromA(am, am + 1)
-    // everything above a(am) with everything above the found insertion point into the result
-    merge0(am + 1, a1, bm, b1)
-  }
-}
+```rust
+    fn binary_merge(&self, m: &mut M, an: usize, bn: usize) -> bool {
+        if an == 0 {
+            bn == 0 || self.from_b(m, bn)
+        } else if bn == 0 {
+            an == 0 || self.from_a(m, an)
+        } else {
+            // neither a nor b are 0
+            let am: usize = an / 2;
+            // pick the center element of a and find the corresponding one in b using binary search
+            let a = &m.a_slice()[am];
+            match m.b_slice()[..bn].binary_search_by(|b| self.cmp(a, b).reverse()) {
+                Ok(bm) => {
+                    // same elements. bm is the index corresponding to am
+                    // merge everything below am with everything below the found element bm
+                    self.binary_merge(m, am, bm) &&
+                    // add the elements a(am) and b(bm)
+                    self.collision(m) &&
+                    // merge everything above a(am) with everything above the found element
+                    self.binary_merge(m, an - am - 1, bn - bm - 1)
+                }
+                Err(bi) => {
+                    // not found. bi is the insertion point
+                    // merge everything below a(am) with everything below the found insertion point bi
+                    self.binary_merge(m, am, bi) &&
+                    // add a(am)
+                    self.from_a(m, 1) &&
+                    // everything above a(am) with everything above the found insertion point
+                    self.binary_merge(m, an - am - 1, bn - bi)
+                }
+            }
+        }
+    }
 ```
 
 Note that while this method is using recursion, it is not referentially transparent. The result sequence is built in the methods fromA and fromB using a mutable builder for efficiency. Of course, you will typically wrap this algorithm in a referentially transparent way.
