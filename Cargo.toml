@@ -22,3 +22,6 @@ proptest = "1.0.0"
 [[bench]]
 name = "merge"
 harness = false
+
+[lib]
+doctest = false

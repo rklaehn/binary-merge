@@ -80,27 +80,26 @@ pub trait MergeOperation<M: MergeState> {
     /// This is the classical tape merge algorithm, useful for when either
     /// the number of elements is small or the comparison operation is very cheap.
     fn tape_merge(&self, m: &mut M) -> bool {
-        while !m.a_slice().is_empty() && !m.b_slice().is_empty() {
-            // very convoluted way to access the first element.
-            let a = &m.a_slice()[0];
-            let b = &m.b_slice()[0];
-            // calling the various ops advances the pointers
-            let r = match self.cmp(a, b) {
-                Ordering::Equal => self.collision(m),
-                Ordering::Less => self.from_a(m, 1),
-                Ordering::Greater => self.from_b(m, 1),
-            };
-            if !r {
-                return false;
+        loop {
+            if let Some(a) = m.a_slice().first() {
+                if let Some(b) = m.b_slice().first() {
+                    // something left in both a and b
+                    if !match self.cmp(a, b) {
+                        Ordering::Less => self.from_a(m, 1),
+                        Ordering::Equal => self.collision(m),
+                        Ordering::Greater => self.from_b(m, 1),
+                    } {
+                        return false;
+                    }
+                } else {
+                    // b is empty, add the rest of a
+                    break m.a_slice().is_empty() || self.from_a(m, m.a_slice().len());
+                }
+            } else {
+                // a is empty, add the rest of b
+                break m.b_slice().is_empty() || self.from_b(m, m.b_slice().len());
             }
         }
-        if !m.a_slice().is_empty() && !self.from_a(m, m.a_slice().len()) {
-            return false;
-        }
-        if !m.b_slice().is_empty() && !self.from_b(m, m.b_slice().len()) {
-            return false;
-        }
-        true
     }
     fn merge(&self, m: &mut M) -> bool {
         let an = m.a_slice().len();
