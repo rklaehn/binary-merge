@@ -2,6 +2,14 @@
 name = "binary-merge"
 version = "0.1.0"
 edition = "2021"
+authors = ["Rüdiger Klaehn <rklaehn@protonmail.com>"]
+description = "Minimum comparison merge of two sorted sequences with random access"
+repository = "https://github.com/rklaehn/binary-merge"
+license = "MIT OR Apache-2.0"
+keywords = ["array", "sorting", "merging"]
+categories = ["Algorithms"]
+readme = "README.md"
+homepage = "https://github.com/rklaehn"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

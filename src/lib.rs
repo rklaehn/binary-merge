@@ -1,4 +1,4 @@
-//! Minimum comparison merge of two random access sequences
+#![doc = include_str!("../README.md")]
 #[cfg(test)]
 mod test;
 
