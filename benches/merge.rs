@@ -86,8 +86,8 @@ fn binary_merge_union<T: Ord + Clone>(a: &[T], b: &[T]) -> Vec<T> {
 /// tape merge union
 fn tape_merge_union<T: Ord + Clone>(a: &[T], b: &[T]) -> Vec<T> {
     let mut state = VecMergeState {
-        a: a.into_iter(),
-        b: b.into_iter(),
+        a: a.iter(),
+        b: b.iter(),
         r: Vec::with_capacity(a.len().max(b.len())),
     };
     TapeMergeUnion.merge(&mut state);
